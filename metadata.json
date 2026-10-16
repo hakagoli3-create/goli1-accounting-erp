@@ -2,5 +2,7 @@
   "name": "مدیریت حسابداری گلی",
   "description": "سیستم جامع حسابداری مالی چندسطحی، انبارداری، خزانه‌داری، صدور فاکتور و صندوق فروشگاهی گلی",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
