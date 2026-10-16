@@ -24,16 +24,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,11 +65,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.AccountGroupEntity
+import com.example.data.model.AppSecurityAndSettingsManager
+import com.example.data.model.GeneralAccountEntity
+import com.example.data.model.JournalEntryEntity
+import com.example.data.model.SubsidiaryAccountEntity
+import com.example.data.model.TrialBalanceRow
 import com.example.ui.components.ErpTopAppBar
 import com.example.ui.theme.AccountingCreditRed
 import com.example.ui.theme.AccountingDebitGreen
+import com.example.ui.theme.PersianGold
 import com.example.ui.viewmodel.AccountingViewModel
+import com.example.ui.viewmodel.ProfitLossStatement
 import com.example.ui.viewmodel.VoucherItemDraft
+import com.example.util.ExportHelper
 import com.example.util.NumberFormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,14 +87,18 @@ fun AccountingScreen(
     viewModel: AccountingViewModel
 ) {
     val context = LocalContext.current
+    val securityManager = remember { AppSecurityAndSettingsManager.getInstance(context) }
+    val currentRole by securityManager.currentRole.collectAsStateWithLifecycle()
+
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("درخت حساب‌ها", "اسناد مالی", "ثبت سند دوبل", "تراز آزمایشی")
+    val tabs = listOf("درخت حساب‌ها", "اسناد مالی", "ثبت سند دوبل", "تراز آزمایشی", "سود و زیان")
 
     val groups by viewModel.allGroups.collectAsStateWithLifecycle()
     val generals by viewModel.allGenerals.collectAsStateWithLifecycle()
     val subsidiaries by viewModel.allSubsidiaries.collectAsStateWithLifecycle()
     val journalEntries by viewModel.allJournalEntries.collectAsStateWithLifecycle()
     val trialBalance by viewModel.trialBalance.collectAsStateWithLifecycle()
+    val profitLoss by viewModel.profitLoss.collectAsStateWithLifecycle()
 
     val draftDesc by viewModel.draftVoucherDescription.collectAsStateWithLifecycle()
     val draftDate by viewModel.draftVoucherDate.collectAsStateWithLifecycle()
@@ -97,15 +116,15 @@ fun AccountingScreen(
         topBar = {
             Column {
                 ErpTopAppBar(
-                    title = "حسابداری مالی چندسطحی",
-                    subtitle = "کدینگ، ثبت اسناد دوبل، تراز آزمایشی و دفاتر"
+                    title = "حسابداری مالی چندسطحی و سود/زیان",
+                    subtitle = "کدینگ ۳ سطحی، ثبت اسناد دوبل، تراز معین و گزارش سود و زیان رسمی"
                 )
                 PrimaryTabRow(selectedTabIndex = selectedTab) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
-                            text = { Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                            text = { Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
                             modifier = Modifier.testTag("accounting_tab_$index")
                         )
                     }
@@ -120,7 +139,25 @@ fun AccountingScreen(
         ) {
             when (selectedTab) {
                 0 -> AccountTreeContent(groups, generals, subsidiaries)
-                1 -> JournalEntriesContent(journalEntries)
+                1 -> JournalEntriesContent(
+                    entries = journalEntries,
+                    onExportPdf = {
+                        val headers = listOf("شماره سند", "تاریخ سند", "شرح سند", "وضعیت")
+                        val rows = journalEntries.map {
+                            listOf(it.voucherNumber.toString(), it.jalaliDate, it.description, if (it.isBalanced) "تراز" else "ناهمخوان")
+                        }
+                        val f = ExportHelper.exportReportPdf(context, "دفتر روزنامه و اسناد حسابداری", headers, rows)
+                        if (f != null) ExportHelper.shareFile(context, f, "application/pdf", "اسناد حسابداری PDF")
+                    },
+                    onExportCsv = {
+                        val headers = listOf("شماره سند", "تاریخ", "شرح", "وضعیت")
+                        val rows = journalEntries.map {
+                            listOf(it.voucherNumber.toString(), it.jalaliDate, it.description, it.status)
+                        }
+                        val f = ExportHelper.exportReportCsv(context, "فهرست اسناد روزنامه", headers, rows)
+                        if (f != null) ExportHelper.shareFile(context, f, "text/csv", "خروجی اکسل اسناد")
+                    }
+                )
                 2 -> CreateJournalVoucherContent(
                     subsidiaries = subsidiaries,
                     generals = generals,
@@ -133,11 +170,137 @@ fun AccountingScreen(
                     onRemoveItem = { viewModel.removeDraftItem(it) },
                     onSubmit = {
                         viewModel.submitJournalVoucher {
-                            selectedTab = 1 // Switch to entries tab after success
+                            selectedTab = 1
                         }
                     }
                 )
-                3 -> TrialBalanceContent(trialBalance)
+                3 -> TrialBalanceContent(
+                    trialBalance = trialBalance,
+                    onExportPdf = { viewModel.exportTrialBalancePdf(context) },
+                    onExportCsv = { viewModel.exportTrialBalanceCsv(context) }
+                )
+                4 -> ProfitLossContent(
+                    statement = profitLoss,
+                    canViewProfit = currentRole.canViewProfit,
+                    onExportPdf = { viewModel.exportProfitLossPdf(context) },
+                    onExportCsv = { viewModel.exportProfitLossCsv(context) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfitLossContent(
+    statement: ProfitLossStatement,
+    canViewProfit: Boolean,
+    onExportPdf: () -> Unit,
+    onExportCsv: () -> Unit
+) {
+    if (!canViewProfit) {
+        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = AccountingCreditRed, modifier = Modifier.size(48.dp))
+                    Text("محدودیت دسترسی نقش کاربر", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("مشاهده صورت سود و زیان مالی تنها برای نقش «مدیر کل» مجاز است. لطفاً از بخش تنظیمات نقش خود را تغییر دهید.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("صورت سود و زیان جامع دوره", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = onExportPdf,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(imageVector = Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("PDF", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onExportCsv,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PersianGold)
+                    ) {
+                        Icon(imageVector = Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("اکسل", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("درآمدهای عملیاتی و حاصل از فروش:", fontSize = 13.sp)
+                        Text(NumberFormatUtils.formatPrice(statement.totalRevenue), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccountingDebitGreen)
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("بهای تمام شده کالای فروش رفته (COGS):", fontSize = 13.sp)
+                        Text("(${NumberFormatUtils.formatPrice(statement.costOfGoodsSold)})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccountingCreditRed)
+                    }
+
+                    HorizontalDivider()
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("سود (زیان) ناخالص:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(
+                            text = NumberFormatUtils.formatPrice(statement.grossProfit),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = if (statement.grossProfit >= 0) AccountingDebitGreen else AccountingCreditRed
+                        )
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("هزینه‌های عمومی، اداری و توزیع:", fontSize = 13.sp)
+                        Text("(${NumberFormatUtils.formatPrice(statement.operatingExpenses)})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AccountingCreditRed)
+                    }
+
+                    HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("سود (زیان) خالص نهایی دوره:", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(
+                            text = NumberFormatUtils.formatPrice(statement.netProfit),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = if (statement.netProfit >= 0) AccountingDebitGreen else AccountingCreditRed
+                        )
+                    }
+                }
             }
         }
     }
@@ -145,83 +308,91 @@ fun AccountingScreen(
 
 @Composable
 private fun AccountTreeContent(
-    groups: List<com.example.data.model.AccountGroupEntity>,
-    generals: List<com.example.data.model.GeneralAccountEntity>,
-    subsidiaries: List<com.example.data.model.SubsidiaryAccountEntity>
+    groups: List<AccountGroupEntity>,
+    generals: List<GeneralAccountEntity>,
+    subsidiaries: List<SubsidiaryAccountEntity>
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         items(groups) { group ->
+            var expanded by remember { mutableStateOf(true) }
+            val groupGenerals = generals.filter { it.groupCode == group.code }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = NumberFormatUtils.toPersianDigits(group.code.toString()),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = PersianGold,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "گروه: ${group.title}",
+                                text = "${group.code} - ${group.title}",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                         Text(
-                            text = if (group.nature == "DEBIT") "ماهیت بدهکار" else "ماهیت بستانکار",
+                            text = if (group.nature == "DEBIT") "ماهیت: بدهکار" else "ماهیت: بستانکار",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (group.nature == "DEBIT") AccountingDebitGreen else AccountingCreditRed
                         )
                     }
 
-                    val groupGenerals = generals.filter { it.groupCode == group.code }
-                    groupGenerals.forEach { gen ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = "کل [${NumberFormatUtils.toPersianDigits(gen.code.toString())}]: ${gen.title}",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    if (expanded) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        groupGenerals.forEach { gen ->
+                            val genSubs = subsidiaries.filter { it.generalCode == gen.code }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
-
-                                val genSubs = subsidiaries.filter { it.generalCode == gen.code }
-                                genSubs.forEach { sub ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 4.dp, start = 14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "• معین [${NumberFormatUtils.toPersianDigits(sub.code.toString())}]: ${sub.title}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = "${gen.code} - ${gen.title}",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    genSubs.forEach { sub ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp, horizontal = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "↳ ${sub.code} - ${sub.title}",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            Text(
+                                                text = if (sub.nature == "DEBIT") "بدهکار" else "بستانکار",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.Gray
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -235,11 +406,13 @@ private fun AccountTreeContent(
 
 @Composable
 private fun JournalEntriesContent(
-    entries: List<com.example.data.model.JournalEntryEntity>
+    entries: List<JournalEntryEntity>,
+    onExportPdf: () -> Unit,
+    onExportCsv: () -> Unit
 ) {
     if (entries.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("هیچ سند حسابداری ثبت نشده است.")
+            Text("هیچ سند حسابداری هنوز ثبت نشده است.")
         }
         return
     }
@@ -248,61 +421,100 @@ private fun JournalEntriesContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("دفتر روزنامه اسناد (${entries.size} سند)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = onExportPdf,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("PDF اسناد", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onExportCsv,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PersianGold)
+                    ) {
+                        Text("اکسل", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
         items(entries) { entry ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "سند شماره ${NumberFormatUtils.toPersianDigits(entry.voucherNumber.toString())}",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Default.Receipt,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(AccountingDebitGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "تراز شده",
-                                    color = AccountingDebitGreen,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "سند شماره ${entry.voucherNumber}",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = entry.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "تاریخ: ${entry.jalaliDate}",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = entry.jalaliDate,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "ثبت نهایی",
-                        tint = AccountingDebitGreen,
-                        modifier = Modifier.size(24.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = entry.description,
+                        style = MaterialTheme.typography.bodyMedium
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (entry.isBalanced) Icons.Default.CheckCircle else Icons.Default.Error,
+                                contentDescription = null,
+                                tint = if (entry.isBalanced) AccountingDebitGreen else AccountingCreditRed,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (entry.isBalanced) "سند تراز شده" else "عدم تراز",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (entry.isBalanced) AccountingDebitGreen else AccountingCreditRed
+                            )
+                        }
+                        Text(
+                            text = "وضعیت: ${if (entry.status == "FINAL") "قطعی" else "پیش‌نویس"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -312,8 +524,8 @@ private fun JournalEntriesContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateJournalVoucherContent(
-    subsidiaries: List<com.example.data.model.SubsidiaryAccountEntity>,
-    generals: List<com.example.data.model.GeneralAccountEntity>,
+    subsidiaries: List<SubsidiaryAccountEntity>,
+    generals: List<GeneralAccountEntity>,
     draftDesc: String,
     draftDate: String,
     draftItems: List<VoucherItemDraft>,
@@ -324,20 +536,21 @@ private fun CreateJournalVoucherContent(
     onSubmit: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedSub by remember { mutableStateOf<com.example.data.model.SubsidiaryAccountEntity?>(null) }
+    var selectedSub by remember { mutableStateOf<SubsidiaryAccountEntity?>(null) }
     var itemDesc by remember { mutableStateOf("") }
     var itemDebitText by remember { mutableStateOf("") }
     var itemCreditText by remember { mutableStateOf("") }
 
     val totalDebit = draftItems.sumOf { it.debit }
     val totalCredit = draftItems.sumOf { it.credit }
-    val isBalanced = draftItems.isNotEmpty() && totalDebit == totalCredit
+    val isBalanced = totalDebit == totalCredit && draftItems.isNotEmpty()
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         item {
             Card(
@@ -347,32 +560,31 @@ private fun CreateJournalVoucherContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "مشخصات عمومی سند",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        text = "اطلاعات کلی سند حسابداری",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = draftDate,
-                        onValueChange = onDateChange,
-                        label = { Text("تاریخ سند شمسی (مثال: ۱۴۰۴/۰۷/۲۵)") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("voucher_date_input")
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
+
                     OutlinedTextField(
                         value = draftDesc,
                         onValueChange = onDescChange,
-                        label = { Text("شرح کلی سند حسابداری") },
+                        label = { Text("شرح کلی سند (مثلاً: ثبت هزینه کرایه یا خرید ملزومات)") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("voucher_desc_input")
+                            .testTag("voucher_description_input")
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = draftDate,
+                        onValueChange = onDateChange,
+                        label = { Text("تاریخ سند (هجری شمسی)") },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
 
-        // Add line item card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -489,7 +701,6 @@ private fun CreateJournalVoucherContent(
             }
         }
 
-        // Items list
         items(draftItems.size) { index ->
             val item = draftItems[index]
             Card(
@@ -513,98 +724,90 @@ private fun CreateJournalVoucherContent(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(modifier = Modifier.padding(top = 4.dp)) {
                             if (item.debit > 0) {
                                 Text(
                                     text = "بدهکار: ${NumberFormatUtils.formatPrice(item.debit)}",
                                     color = AccountingDebitGreen,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
                             if (item.credit > 0) {
                                 Text(
                                     text = "بستانکار: ${NumberFormatUtils.formatPrice(item.credit)}",
                                     color = AccountingCreditRed,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
                         }
                     }
+
                     IconButton(onClick = { onRemoveItem(index) }) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف سطر", tint = Color.Gray)
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "حذف سطر",
+                            tint = Color.Gray
+                        )
                     }
                 }
             }
         }
 
-        // Summary Balance Status & Submit
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isBalanced) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
                 )
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "مجموع بدهکار:", fontWeight = FontWeight.Bold)
+                        Text(text = "مجموع بدهکار:", style = MaterialTheme.typography.bodyMedium)
                         Text(
                             text = NumberFormatUtils.formatPrice(totalDebit),
-                            color = AccountingDebitGreen,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = AccountingDebitGreen)
                         )
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "مجموع بستانکار:", fontWeight = FontWeight.Bold)
+                        Text(text = "مجموع بستانکار:", style = MaterialTheme.typography.bodyMedium)
                         Text(
                             text = NumberFormatUtils.formatPrice(totalCredit),
-                            color = AccountingCreditRed,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = AccountingCreditRed)
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isBalanced) Icons.Default.CheckCircle else Icons.Default.Error,
-                                contentDescription = null,
-                                tint = if (isBalanced) AccountingDebitGreen else AccountingCreditRed,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isBalanced) "سند کاملاً تراز است." else "سند تراز نیست (اختلاف: ${NumberFormatUtils.formatPrice(Math.abs(totalDebit - totalCredit))})",
-                                color = if (isBalanced) AccountingDebitGreen else AccountingCreditRed,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Button(
-                        onClick = onSubmit,
-                        enabled = isBalanced && draftItems.size >= 2,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("submit_voucher_button")
-                    ) {
-                        Text("ثبت قطعی سند حسابداری", fontWeight = FontWeight.Bold)
+                        Text(text = "وضعیت تراز دوبل:", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                        Text(
+                            text = if (isBalanced) "سند تراز است ✓" else "اختلاف: ${NumberFormatUtils.formatPrice(Math.abs(totalDebit - totalCredit))}",
+                            color = if (isBalanced) AccountingDebitGreen else AccountingCreditRed,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        )
                     }
                 }
+            }
+        }
+
+        item {
+            Button(
+                onClick = onSubmit,
+                enabled = isBalanced && draftItems.size >= 2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("submit_voucher_button"),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(text = "ثبت نهایی و صدور سند حسابداری")
             }
         }
     }
@@ -612,57 +815,102 @@ private fun CreateJournalVoucherContent(
 
 @Composable
 private fun TrialBalanceContent(
-    trialBalance: List<com.example.data.model.TrialBalanceRow>
+    trialBalance: List<TrialBalanceRow>,
+    onExportPdf: () -> Unit,
+    onExportCsv: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         item {
-            Text(
-                text = "تراز آزمایشی مانده حساب‌های معین",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "تراز آزمایشی چهارستونی معین",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = onExportPdf,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("PDF تراز", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onExportCsv,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PersianGold)
+                    ) {
+                        Text("اکسل", fontSize = 11.sp)
+                    }
+                }
+            }
         }
 
         items(trialBalance) { row ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = "${row.subsidiaryCode} - ${row.title}",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
                             text = row.groupTitle,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "کل: ${row.generalTitle}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "مانده بدهکار: ${NumberFormatUtils.formatPrice(row.balanceDebit)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (row.balanceDebit > 0) AccountingDebitGreen else Color.Gray
-                        )
-                        Text(
-                            text = "مانده بستانکار: ${NumberFormatUtils.formatPrice(row.balanceCredit)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (row.balanceCredit > 0) AccountingCreditRed else Color.Gray
-                        )
+                        Column {
+                            Text(text = "گردش بدهکار: ${NumberFormatUtils.formatPrice(row.totalDebit)}", fontSize = 11.sp)
+                            Text(text = "گردش بستانکار: ${NumberFormatUtils.formatPrice(row.totalCredit)}", fontSize = 11.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            if (row.balanceDebit > 0) {
+                                Text(
+                                    text = "مانده بدهکار: ${NumberFormatUtils.formatPrice(row.balanceDebit)}",
+                                    color = AccountingDebitGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            if (row.balanceCredit > 0) {
+                                Text(
+                                    text = "مانده بستانکار: ${NumberFormatUtils.formatPrice(row.balanceCredit)}",
+                                    color = AccountingCreditRed,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

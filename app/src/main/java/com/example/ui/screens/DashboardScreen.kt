@@ -20,14 +20,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PointOfSale
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,11 +73,12 @@ fun DashboardScreen(
 
     val quickActions = listOf(
         QuickAction("صندوق POS", Icons.Default.PointOfSale, MaterialTheme.colorScheme.primary, "pos"),
-        QuickAction("فاکتور رسمی", Icons.Default.ReceiptLong, PersianGold, "invoices"),
-        QuickAction("حسابداری مالی", Icons.Default.Assignment, Color(0xFF1976D2), "accounting"),
+        QuickAction("فاکتور رسمی", Icons.AutoMirrored.Filled.ReceiptLong, PersianGold, "invoices"),
+        QuickAction("حسابداری مالی", Icons.AutoMirrored.Filled.Assignment, Color(0xFF1976D2), "accounting"),
         QuickAction("خزانه‌داری و چک", Icons.Default.AccountBalance, Color(0xFF7B1FA2), "treasury"),
         QuickAction("انبار و کالا", Icons.Default.Inventory2, Color(0xFF00796B), "inventory"),
-        QuickAction("مشتریان CRM", Icons.Default.People, Color(0xFFE65100), "crm")
+        QuickAction("مشتریان CRM", Icons.Default.People, Color(0xFFE65100), "crm"),
+        QuickAction("تنظیمات و دسترسی", Icons.Default.Settings, Color(0xFF455A64), "settings")
     )
 
     Scaffold(
@@ -215,7 +217,7 @@ fun DashboardScreen(
                     title = "فروش امروز",
                     value = NumberFormatUtils.formatPrice(state.todaySalesAmount),
                     subValue = "${NumberFormatUtils.toPersianDigits(state.todayInvoicesCount.toString())} فاکتور صادر شده",
-                    icon = Icons.Default.ReceiptLong,
+                    icon = Icons.AutoMirrored.Filled.ReceiptLong,
                     iconTint = AccountingDebitGreen,
                     onClick = { onNavigateToRoute("invoices") }
                 )

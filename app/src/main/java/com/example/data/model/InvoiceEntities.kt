@@ -34,6 +34,9 @@ data class InvoiceEntity(
     val posAmount: Long = 0L,
     val creditAmount: Long = 0L,
     val chequeAmount: Long = 0L,
+    val cashDeskId: Long = 1L,
+    val bankAccountId: Long = 1L,
+    val pricingMode: String = "RETAIL", // "RETAIL" or "WHOLESALE"
     val isPaid: Boolean = true,
     val status: String = "FINAL", // "FINAL" or "DRAFT"
     val notes: String = ""

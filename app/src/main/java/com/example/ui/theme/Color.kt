@@ -2,27 +2,41 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val EmeraldPrimary = Color(0xFF0A6847)
-val EmeraldOnPrimary = Color(0xFFFFFFFF)
-val EmeraldContainer = Color(0xFFD1E7DD)
-val EmeraldOnContainer = Color(0xFF07432E)
+// --- Charcoal Matte Palette (مات زغالی و رسمی) ---
+val CharcoalPrimary = Color(0xFF1E222A)
+val CharcoalDark = Color(0xFF13151A)
+val CharcoalSurface = Color(0xFF1F232B)
+val CharcoalCard = Color(0xFF282D37)
+val CharcoalBorder = Color(0xFF3E4554)
+val CharcoalSecondary = Color(0xFF353B47)
 
-val PersianGold = Color(0xFFB8860B)
-val GoldContainer = Color(0xFFFFF3CD)
-val GoldOnContainer = Color(0xFF5D4302)
+// --- Cream & Warm Beige Palette (کرم و بژ لوکس با کنتراست بالا) ---
+val WarmCreamBackground = Color(0xFFFAF7F2)
+val WarmBeigeCard = Color(0xFFF2ECE1)
+val CreamSurface = Color(0xFFFFFFFF)
+val BeigeBorder = Color(0xFFDDD4C5)
+val WarmTextDark = Color(0xFF181B20)
+val WarmTextMuted = Color(0xFF5A626F)
 
-val DeepTeal = Color(0xFF134E5E)
-val TealContainer = Color(0xFFD0EDF5)
+// --- Accent & Financial Identity Colors ---
+val PersianGold = Color(0xFFC59B27)
+val PersianGoldLight = Color(0xFFE5BE53)
+val PersianGoldContainer = Color(0xFFFFF4D6)
+val PersianGoldOnContainer = Color(0xFF4C3B08)
 
-val AccountingDebitGreen = Color(0xFF2E7D32)
-val AccountingCreditRed = Color(0xFFC62828)
-val AlertWarningOrange = Color(0xFFEF6C00)
+val SlateBlueAccent = Color(0xFF2E3D4F)
+val SlateBlueContainer = Color(0xFFDDE4EC)
 
-val SurfaceLight = Color(0xFFF9FBFA)
-val BackgroundLight = Color(0xFFF0F4F2)
-val CardBackgroundLight = Color(0xFFFFFFFF)
+// Financial Indicators (High Contrast)
+val AccountingDebitGreen = Color(0xFF1B5E20)
+val AccountingCreditRed = Color(0xFFB71C1C)
+val AlertWarningOrange = Color(0xFFD84315)
+val StatusInfoBlue = Color(0xFF0D47A1)
 
-val PrimaryDark = Color(0xFF48C78E)
-val BackgroundDark = Color(0xFF0D1612)
-val SurfaceDark = Color(0xFF14211B)
-val CardBackgroundDark = Color(0xFF1B2B23)
+// Dark Theme Variants
+val DarkBackground = Color(0xFF121418)
+val DarkSurface = Color(0xFF1A1D23)
+val DarkCard = Color(0xFF232832)
+val DarkBorder = Color(0xFF373E4D)
+val DarkTextPrimary = Color(0xFFF5F7FA)
+val DarkTextSecondary = Color(0xFFA5B0BF)

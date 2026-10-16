@@ -28,9 +28,13 @@ class TreasuryRepository(private val dao: TreasuryDao) {
     }
 
     suspend fun insertCashDesk(cashDesk: CashDeskEntity): Long = dao.insertCashDesk(cashDesk)
+    suspend fun updateCashDesk(cashDesk: CashDeskEntity) = dao.updateCashDesk(cashDesk)
+    suspend fun deleteCashDesk(cashDesk: CashDeskEntity) = dao.deleteCashDesk(cashDesk)
     suspend fun updateCashBalance(id: Long, delta: Long) = dao.updateCashBalance(id, delta)
 
     suspend fun insertBankAccount(account: BankAccountEntity): Long = dao.insertBankAccount(account)
+    suspend fun updateBankAccount(account: BankAccountEntity) = dao.updateBankAccount(account)
+    suspend fun deleteBankAccount(account: BankAccountEntity) = dao.deleteBankAccount(account)
     suspend fun updateBankBalance(id: Long, delta: Long) = dao.updateBankBalance(id, delta)
 
     suspend fun insertCheque(cheque: ChequeEntity): Long = dao.insertCheque(cheque)

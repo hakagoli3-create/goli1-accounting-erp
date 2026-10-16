@@ -16,12 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,8 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Money
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -38,12 +34,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.ErpTopAppBar
+import com.example.ui.components.InvoiceSettlementDialog
 import com.example.ui.components.ReceiptPreviewDialog
 import com.example.ui.theme.AccountingCreditRed
 import com.example.ui.theme.AccountingDebitGreen
@@ -87,11 +84,16 @@ fun PosScreen(
     val selectedParty by viewModel.selectedParty.collectAsStateWithLifecycle()
     val discount by viewModel.discountAmount.collectAsStateWithLifecycle()
     val applyTax by viewModel.applyTax.collectAsStateWithLifecycle()
+    val pricingMode by viewModel.pricingMode.collectAsStateWithLifecycle()
+    val cashDesks by viewModel.allCashDesks.collectAsStateWithLifecycle()
+    val bankAccounts by viewModel.allBankAccounts.collectAsStateWithLifecycle()
+
     val previewReceipt by viewModel.previewReceiptText.collectAsStateWithLifecycle()
     val alertMessage by viewModel.alertMessage.collectAsStateWithLifecycle()
 
     var barcodeInput by remember { mutableStateOf("") }
     var customerMenuExpanded by remember { mutableStateOf(false) }
+    var showSettlementDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(alertMessage) {
         alertMessage?.let {
@@ -109,7 +111,7 @@ fun PosScreen(
         topBar = {
             ErpTopAppBar(
                 title = "صندوق فروشگاهی لمسی POS",
-                subtitle = "اسکن سریع بارکد، ثبت لحظه‌ای سبد کالا و تسویه نقدی/پوز"
+                subtitle = "اسکن بارکد، انتخاب سریع کالا، قیمت‌گذاری تکی/عمده و تسویه چندگانه"
             )
         }
     ) { innerPadding ->
@@ -118,11 +120,11 @@ fun PosScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Barcode Input & Scanner Bar
+            // Barcode Input & Pricing Mode Switch
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
@@ -161,6 +163,22 @@ fun PosScreen(
                     ) {
                         Text("ثبت")
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Mode indicator / switch
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FilterChip(
+                            selected = pricingMode == "RETAIL",
+                            onClick = { viewModel.setPricingMode("RETAIL") },
+                            label = { Text("تکی", fontSize = 11.sp) }
+                        )
+                        FilterChip(
+                            selected = pricingMode == "WHOLESALE",
+                            onClick = { viewModel.setPricingMode("WHOLESALE") },
+                            label = { Text("عمده", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                        )
+                    }
                 }
             }
 
@@ -179,7 +197,7 @@ fun PosScreen(
                         .fillMaxSize()
                 ) {
                     Text(
-                        text = "اقلام فروشگاه (انتخاب سریع)",
+                        text = "اقلام فروشگاه (${if (pricingMode == "WHOLESALE") "قیمت عمده" else "قیمت مصرف‌کننده"})",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
@@ -191,20 +209,19 @@ fun PosScreen(
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
                         items(products) { product ->
+                            val displayPrice = if (pricingMode == "WHOLESALE") product.wholesalePrice else product.retailPrice
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        viewModel.addToCart(product, isPrimary = false, wholesale = false)
+                                        viewModel.addToCart(product, isPrimary = false)
                                     }
                                     .testTag("pos_product_item_${product.id}"),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(10.dp)
-                                ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
                                     Text(
                                         text = product.name,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
@@ -212,7 +229,7 @@ fun PosScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = NumberFormatUtils.formatPrice(product.retailPrice),
+                                        text = NumberFormatUtils.formatPrice(displayPrice),
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Bold
@@ -375,7 +392,7 @@ fun PosScreen(
                             )
                         }
 
-                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -393,59 +410,70 @@ fun PosScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Checkout Action Buttons
+                        // Fast Cash / POS or Advanced Settlement
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Button(
                                 onClick = {
-                                    viewModel.checkout("POS") {
-                                        Toast.makeText(context, "فاکتور با موفقیت تسویه شد.", Toast.LENGTH_SHORT).show()
+                                    if (cartItems.isEmpty()) {
+                                        Toast.makeText(context, "سبد خالی است", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
+                                    viewModel.checkoutAdvanced(
+                                        paymentType = "CASH",
+                                        cashAmount = grandTotal
+                                    ) {
+                                        Toast.makeText(context, "تسویه نقدی با موفقیت انجام شد.", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                enabled = cartItems.isNotEmpty(),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("checkout_pos_button")
-                            ) {
-                                Icon(imageVector = Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("پوز", fontSize = 12.sp)
-                            }
-
-                            Button(
-                                onClick = {
-                                    viewModel.checkout("CASH") {
-                                        Toast.makeText(context, "فاکتور نقدی ثبت شد.", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                enabled = cartItems.isNotEmpty(),
+                                modifier = Modifier.weight(1f).testTag("pos_fast_cash_button"),
                                 colors = ButtonDefaults.buttonColors(containerColor = AccountingDebitGreen),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("checkout_cash_button")
+                                shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Money, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Money, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("نقد", fontSize = 12.sp)
+                                Text("نقد", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
 
                             Button(
                                 onClick = {
-                                    viewModel.checkout("CREDIT") {
-                                        Toast.makeText(context, "فاکتور نسیه ثبت شد.", Toast.LENGTH_SHORT).show()
+                                    if (cartItems.isEmpty()) {
+                                        Toast.makeText(context, "سبد خالی است", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
+                                    viewModel.checkoutAdvanced(
+                                        paymentType = "POS",
+                                        posAmount = grandTotal
+                                    ) {
+                                        Toast.makeText(context, "تسویه کارتخوان با موفقیت انجام شد.", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                enabled = cartItems.isNotEmpty(),
-                                colors = ButtonDefaults.buttonColors(containerColor = PersianGold),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("checkout_credit_button")
+                                modifier = Modifier.weight(1f).testTag("pos_fast_pos_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("نسیه", fontSize = 12.sp)
+                                Text("پوز", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (cartItems.isEmpty()) {
+                                        Toast.makeText(context, "سبد خالی است", Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
+                                    showSettlementDialog = true
+                                },
+                                modifier = Modifier.weight(1.3f).testTag("pos_advanced_settlement_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = PersianGold),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("سایر / ترکیبی", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -454,7 +482,35 @@ fun PosScreen(
         }
     }
 
-    // Receipt Preview Dialog
+    if (showSettlementDialog) {
+        InvoiceSettlementDialog(
+            totalAmount = grandTotal,
+            cashDesks = cashDesks,
+            bankAccounts = bankAccounts,
+            selectedParty = selectedParty,
+            onDismiss = { showSettlementDialog = false },
+            onConfirmSettlement = { paymentType, cash, pos, cheque, credit, deskId, bankId, chNum, sayad, due, bankName, notes ->
+                viewModel.checkoutAdvanced(
+                    paymentType = paymentType,
+                    cashAmount = cash,
+                    posAmount = pos,
+                    chequeAmount = cheque,
+                    creditAmount = credit,
+                    cashDeskId = deskId,
+                    bankAccountId = bankId,
+                    chequeNumber = chNum,
+                    sayadNumber = sayad,
+                    chequeDueDate = due,
+                    chequeBankName = bankName,
+                    notes = notes
+                ) {
+                    showSettlementDialog = false
+                    Toast.makeText(context, "فاکتور با موفقیت تسویه و صادر شد.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
     previewReceipt?.let { text ->
         ReceiptPreviewDialog(
             receiptText = text,

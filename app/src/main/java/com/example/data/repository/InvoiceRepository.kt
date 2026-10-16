@@ -78,10 +78,10 @@ class InvoiceRepository(
 
         // 3. به روزرسانی خزانه‌داری (صندوق و پوز)
         if (invoice.cashAmount > 0) {
-            treasuryDao.updateCashBalance(1, invoice.cashAmount)
+            treasuryDao.updateCashBalance(invoice.cashDeskId, invoice.cashAmount)
         }
         if (invoice.posAmount > 0) {
-            treasuryDao.updateBankBalance(1, invoice.posAmount)
+            treasuryDao.updateBankBalance(invoice.bankAccountId, invoice.posAmount)
         }
 
         // 4. صدور خودکار سند دوبل حسابداری در دفتر روزنامه

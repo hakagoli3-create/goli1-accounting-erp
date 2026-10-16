@@ -30,6 +30,12 @@ interface TreasuryDao {
     @Query("SELECT SUM(currentBalance) FROM cash_desks")
     fun getTotalCashBalance(): Flow<Long?>
 
+    @Update
+    suspend fun updateCashDesk(cashDesk: CashDeskEntity)
+
+    @Delete
+    suspend fun deleteCashDesk(cashDesk: CashDeskEntity)
+
     // Bank Accounts
     @Query("SELECT * FROM bank_accounts ORDER BY id ASC")
     fun getAllBankAccounts(): Flow<List<BankAccountEntity>>
@@ -42,6 +48,12 @@ interface TreasuryDao {
 
     @Query("UPDATE bank_accounts SET currentBalance = currentBalance + :delta WHERE id = :id")
     suspend fun updateBankBalance(id: Long, delta: Long)
+
+    @Update
+    suspend fun updateBankAccount(bankAccount: BankAccountEntity)
+
+    @Delete
+    suspend fun deleteBankAccount(bankAccount: BankAccountEntity)
 
     @Query("SELECT SUM(currentBalance) FROM bank_accounts")
     fun getTotalBankBalance(): Flow<Long?>

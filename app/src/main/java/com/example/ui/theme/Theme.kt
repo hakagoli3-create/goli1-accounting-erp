@@ -1,44 +1,56 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = SurfaceDark,
-    primaryContainer = CardBackgroundDark,
-    onPrimaryContainer = PrimaryDark,
+    primary = PersianGoldLight,
+    onPrimary = CharcoalDark,
+    primaryContainer = CharcoalCard,
+    onPrimaryContainer = PersianGoldLight,
     secondary = PersianGold,
-    onSecondary = SurfaceDark,
-    secondaryContainer = GoldOnContainer,
-    onSecondaryContainer = GoldContainer,
-    tertiary = DeepTeal,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceVariant = CardBackgroundDark
+    onSecondary = CharcoalDark,
+    secondaryContainer = CharcoalSecondary,
+    onSecondaryContainer = PersianGoldContainer,
+    tertiary = SlateBlueAccent,
+    background = DarkBackground,
+    onBackground = DarkTextPrimary,
+    surface = DarkSurface,
+    onSurface = DarkTextPrimary,
+    surfaceVariant = DarkCard,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkBorder
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = EmeraldPrimary,
-    onPrimary = EmeraldOnPrimary,
-    primaryContainer = EmeraldContainer,
-    onPrimaryContainer = EmeraldOnContainer,
+    primary = CharcoalPrimary,
+    onPrimary = Color.White,
+    primaryContainer = WarmBeigeCard,
+    onPrimaryContainer = CharcoalPrimary,
     secondary = PersianGold,
-    onSecondary = EmeraldOnPrimary,
-    secondaryContainer = GoldContainer,
-    onSecondaryContainer = GoldOnContainer,
-    tertiary = DeepTeal,
-    background = BackgroundLight,
-    surface = SurfaceLight,
-    surfaceVariant = CardBackgroundLight
+    onSecondary = Color.White,
+    secondaryContainer = PersianGoldContainer,
+    onSecondaryContainer = PersianGoldOnContainer,
+    tertiary = SlateBlueAccent,
+    background = WarmCreamBackground,
+    onBackground = WarmTextDark,
+    surface = CreamSurface,
+    onSurface = WarmTextDark,
+    surfaceVariant = WarmBeigeCard,
+    onSurfaceVariant = WarmTextMuted,
+    outline = BeigeBorder
 )
+
+val LocalThemeIsDark = compositionLocalOf { mutableStateOf(false) }
 
 @Composable
 fun GoliAccountingTheme(
