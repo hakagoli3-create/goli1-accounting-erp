@@ -35,11 +35,46 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Prepare Build Environment
+      - name: Prepare Environment and Google Services
         run: |
           chmod +x ./gradlew
           if [ ! -f .env ]; then
             cp .env.example .env 2>/dev/null || touch .env
+          fi
+          # Ensure google-services.json exists
+          if [ ! -f app/google-services.json ]; then
+            echo "Creating fallback app/google-services.json"
+            cat << 'EOF' > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "140084369102",
+              "project_id": "goli-accounting-erp",
+              "storage_bucket": "goli-accounting-erp.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:140084369102:android:65a4bc837d9210ef821bc1",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.goliaccounting.kxrvzt"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDummyKeyForGoliAccountingOnlineSync123"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
           fi
 
       - name: Run Tests
@@ -48,11 +83,11 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Rename and Prepare Direct APK
+      - name: Prepare Direct APK Output
         run: |
           mkdir -p build-output
           cp app/build/outputs/apk/debug/app-debug.apk build-output/GoliAccounting.apk
-          echo "APK successfully built at build-output/GoliAccounting.apk"
+          echo "APK successfully generated: build-output/GoliAccounting.apk"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
