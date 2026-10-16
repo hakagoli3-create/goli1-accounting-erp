@@ -5,70 +5,72 @@ on:
     branches:
       - main
       - master
-    tags:
-      - 'v*'
   pull_request:
     branches:
       - main
       - master
   workflow_dispatch:
 
-permissions:
-  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build & Test APK
+    name: Build APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Java JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle Cache
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Ensure Environment Configuration
+      - name: Prepare Build Environment
         run: |
+          chmod +x ./gradlew
           if [ ! -f .env ]; then
             cp .env.example .env 2>/dev/null || touch .env
           fi
-          chmod +x ./gradlew
 
-      - name: Run Unit & Robolectric Tests
+      - name: Run Tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Locate Generated APK
-        id: apk-path
+      - name: Rename and Prepare Direct APK
         run: |
-          APK_FILE=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-          echo "Found APK: $APK_FILE"
-          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          mkdir -p build-output
+          cp app/build/outputs/apk/debug/app-debug.apk build-output/GoliAccounting.apk
+          echo "APK successfully built at build-output/GoliAccounting.apk"
 
-      - name: Upload Debug APK Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GoliAccounting-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: GoliAccounting-APK
+          path: build-output/GoliAccounting.apk
           retention-days: 30
+          compression-level: 0
 
-      - name: Create GitHub Release on Tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish Direct APK to GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.apk-path.outputs.apk_path }}
-          name: Release ${{ github.ref_name }}
+          tag_name: latest
+          name: "Goli Accounting Latest APK"
+          body: "Direct download of Goli Accounting Android APK (ready-to-install without unzipping)."
           draft: false
           prerelease: false
-          generate_release_notes: true
+          files: build-output/GoliAccounting.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
