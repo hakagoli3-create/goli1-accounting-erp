@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">مدیریت حسابداری گلی</string>
+    <string name="company_name">حسابداری و ERP بازرگانی گلی</string>
+    <string name="currency_toman">تومان</string>
+    <string name="currency_rial">ریال</string>
+</resources>
