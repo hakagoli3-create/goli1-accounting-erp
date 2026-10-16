@@ -35,12 +35,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Prepare Environment and Google Services
+      - name: Prepare Keystore, Environment and Google Services
         run: |
           chmod +x ./gradlew
+          
+          # Restore or generate debug.keystore
+          if [ ! -f debug.keystore ]; then
+            if [ -f debug.keystore.base64 ]; then
+              echo "Restoring debug.keystore from base64"
+              base64 -d debug.keystore.base64 > debug.keystore
+            else
+              echo "Generating fresh debug.keystore"
+              keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+
           if [ ! -f .env ]; then
             cp .env.example .env 2>/dev/null || touch .env
           fi
+
           # Ensure google-services.json exists
           if [ ! -f app/google-services.json ]; then
             echo "Creating fallback app/google-services.json"
@@ -78,9 +91,13 @@ jobs:
           fi
 
       - name: Run Tests
+        env:
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
         run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Build Debug APK
+        env:
+          JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Prepare Direct APK Output
